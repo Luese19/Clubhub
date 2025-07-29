@@ -48,7 +48,7 @@ app.use('/api/auth', authRoutes);
 // Serve React app in production
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req: any, res: any) => {
-    const indexPath = path.resolve(__dirname, '../../../dist/index.html');
+    const indexPath = path.resolve(__dirname, '../../../dist/clubhub/index.html');
     console.log('Index.html path:', indexPath);
     res.sendFile(indexPath);
   });

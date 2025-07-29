@@ -10,7 +10,7 @@ import Resources from './components/Resources';
 import Gallery from './components/Gallery';
 import Auth from './components/Auth';
 import Organizations from './components/Organizations';
-import { authService } from './services/authService';
+import { authService } from './services/authService.old';
 import { orgService } from './services/orgService';
 import type { User, Organization } from './types';
 

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { User } from '../types';
-import { authService } from '../services/authService';
+import { authService } from '../services/authService.old';
 
 interface AuthProps {
   onAuthSuccess: (user: User) => void;

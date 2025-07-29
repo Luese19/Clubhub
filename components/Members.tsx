@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './Header';
-import { authService } from '../services/authService.old';
+import { authService } from '../services/authService';
 import type { User } from '../types';
 
 const MemberCard: React.FC<{ 

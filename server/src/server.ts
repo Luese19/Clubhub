@@ -32,7 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from React build in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../../dist')));
+  app.use(express.static(path.join(__dirname, '../../../dist')));
 }
 
 // Health check endpoint
@@ -46,7 +46,7 @@ app.use('/api/auth', authRoutes);
 // Serve React app in production
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req: any, res: any) => {
-    res.sendFile(path.join(__dirname, '../../dist/index.html'));
+    res.sendFile(path.join(__dirname, '../../../dist/index.html'));
   });
 }
 

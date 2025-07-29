@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClubHub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'dark': {
+                50: '#f8fafc',
+                100: '#f1f5f9',
+                200: '#e2e8f0',
+                300: '#cbd5e1',
+                400: '#94a3b8',
+                500: '#64748b',
+                600: '#475569',
+                700: '#334155',
+                800: '#1e293b',
+                850: '#0f1419',
+                900: '#0a0e13',
+                950: '#050711'
+              },
+              'accent': {
+                50: '#f0fdff',
+                100: '#ccfbff',
+                200: '#99f6ff',
+                300: '#4aecff',
+                400: '#06d6f0',
+                500: '#00b8d4',
+                600: '#0891b2',
+                700: '#0e7490',
+                800: '#155e75',
+                900: '#164e63'
+              },
+              'glow': {
+                blue: '#3b82f6',
+                cyan: '#06b6d4',
+                purple: '#8b5cf6',
+                pink: '#ec4899'
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+              mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+            },
+            backdropBlur: {
+              xs: '2px',
+            },
+            animation: {
+              'fade-in': 'fade-in 0.8s cubic-bezier(0.4, 0, 0.2, 1) both',
+              'slide-up': 'slide-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) both',
+              'scale-in': 'scale-in 0.5s cubic-bezier(0.4, 0, 0.2, 1) both',
+              'glow-pulse': 'glow-pulse 2s ease-in-out infinite alternate',
+              'float': 'float 3s ease-in-out infinite',
+            },
+            keyframes: {
+              'fade-in': {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              'slide-up': {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' }
+              },
+              'scale-in': {
+                '0%': { opacity: '0', transform: 'scale(0.95)' },
+                '100%': { opacity: '1', transform: 'scale(1)' }
+              },
+              'glow-pulse': {
+                '0%': { opacity: '0.4' },
+                '100%': { opacity: '0.8' }
+              },
+              'float': {
+                '0%, 100%': { transform: 'translateY(0px)' },
+                '50%': { transform: 'translateY(-5px)' }
+              }
+            },
+            boxShadow: {
+              'glow-sm': '0 0 20px rgba(6, 182, 212, 0.3)',
+              'glow-md': '0 0 30px rgba(6, 182, 212, 0.4)',
+              'glow-lg': '0 0 40px rgba(6, 182, 212, 0.5)',
+              'inner-glow': 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      @layer utilities {
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "react-router-dom": "https://esm.sh/react-router-dom@6",
+    "@google/genai": "https://esm.sh/@google/genai@^1.11.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-dark-900 text-slate-200 font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

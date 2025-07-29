@@ -1,142 +1,198 @@
-import type { User } from '../types';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase.config';
+import type { User, UserRole } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
-
-interface AuthResponse {
-  user: User;
-  token: string;
-}
-
-const getAuthToken = (): string | null => {
-  return localStorage.getItem('authToken');
+// Check if Firebase is configured
+const isFirebaseConfigured = () => {
+  return auth && db && import.meta.env.VITE_FIREBASE_API_KEY !== "your_api_key_here";
 };
 
-const setAuthToken = (token: string): void => {
-  localStorage.setItem('authToken', token);
-};
-
-const removeAuthToken = (): void => {
-  localStorage.removeItem('authToken');
-};
-
-const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
-  const token = getAuthToken();
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-    ...options.headers,
-  };
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+// Convert Firebase user to our User type
+const convertFirebaseUser = async (firebaseUser: FirebaseUser): Promise<User> => {
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase is not configured. Please set up your Firebase environment variables.");
   }
-
-  return response.json();
+  
+  const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+  const userData = userDoc.data();
+  
+  return {
+    email: firebaseUser.email!,
+    role: userData?.role || 'student' as UserRole,
+    organizationId: userData?.organizationId || null,
+    name: userData?.name || firebaseUser.displayName || '',
+    createdAt: userData?.createdAt || new Date().toISOString(),
+  };
 };
 
 export const authService = {
   signUp: async (email: string, password: string): Promise<User> => {
+    if (!isFirebaseConfigured()) {
+      throw new Error("Firebase is not configured. Please set up your Firebase environment variables.");
+    }
+    
     try {
-      const response: AuthResponse = await apiRequest('/auth/signup', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
+      // Create user with Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
 
-      setAuthToken(response.token);
-      return {
-        email: response.user.email,
-        role: response.user.role,
-        organizationId: response.user.organizationId,
+      // Check if this is the first user (they become admin)
+      const usersQuery = query(collection(db, 'users'));
+      const usersSnapshot = await getDocs(usersQuery);
+      const role: UserRole = usersSnapshot.empty ? 'admin' : 'student';
+
+      // Create user document in Firestore
+      const userData = {
+        email: firebaseUser.email,
+        role,
+        organizationId: null,
+        name: '',
+        createdAt: new Date().toISOString(),
       };
-    } catch (error) {
-      throw error;
+
+      await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+
+      return {
+        email: firebaseUser.email!,
+        role,
+        organizationId: null,
+        name: '',
+        createdAt: userData.createdAt,
+      };
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to create account');
     }
   },
 
   signIn: async (email: string, password: string): Promise<User> => {
-    try {
-      const response: AuthResponse = await apiRequest('/auth/signin', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
-
-      setAuthToken(response.token);
-      return {
-        email: response.user.email,
-        role: response.user.role,
-        organizationId: response.user.organizationId,
-      };
-    } catch (error) {
-      throw error;
+    if (!isFirebaseConfigured()) {
+      throw new Error("Firebase is not configured. Please set up your Firebase environment variables.");
     }
-  },
-
-  signOut: (): void => {
-    removeAuthToken();
-  },
-
-  getCurrentUser: (): User | null => {
-    const token = getAuthToken();
-    if (!token) return null;
-
+    
     try {
-      // Decode JWT payload (simple base64 decode - in production you might want more validation)
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
       
-      // Check if token is expired
-      if (payload.exp && payload.exp < Date.now() / 1000) {
-        removeAuthToken();
-        return null;
-      }
-
-      return {
-        email: payload.email,
-        role: payload.role,
-        organizationId: payload.organizationId,
-      };
-    } catch (error) {
-      removeAuthToken();
-      return null;
+      return await convertFirebaseUser(firebaseUser);
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to sign in');
     }
+  },
+
+  signOut: async (): Promise<void> => {
+    try {
+      await firebaseSignOut(auth);
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to sign out');
+    }
+  },
+
+  getCurrentUser: (): Promise<User | null> => {
+    return new Promise((resolve) => {
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        unsubscribe();
+        if (firebaseUser) {
+          try {
+            const user = await convertFirebaseUser(firebaseUser);
+            resolve(user);
+          } catch (error) {
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      });
+    });
   },
 
   isAuthenticated: (): boolean => {
-    return authService.getCurrentUser() !== null;
+    return auth.currentUser !== null;
   },
 
   getUsersByOrg: async (orgId: string): Promise<User[]> => {
     try {
-      const response = await apiRequest(`/organizations/${orgId}/members`);
-      return response.members || [];
-    } catch (error) {
-      throw error;
+      const usersQuery = query(
+        collection(db, 'users'), 
+        where('organizationId', '==', orgId)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      
+      return usersSnapshot.docs.map(doc => ({
+        email: doc.data().email,
+        role: doc.data().role,
+        organizationId: doc.data().organizationId,
+        name: doc.data().name,
+        createdAt: doc.data().createdAt,
+      }));
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to fetch users');
     }
   },
 
   assignUserToOrg: async (email: string, orgId: string): Promise<void> => {
     try {
-      await apiRequest(`/organizations/${orgId}/members`, {
-        method: 'POST',
-        body: JSON.stringify({ email }),
+      // Find user by email
+      const usersQuery = query(
+        collection(db, 'users'), 
+        where('email', '==', email)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      
+      if (usersSnapshot.empty) {
+        throw new Error('User not found');
+      }
+
+      const userDoc = usersSnapshot.docs[0];
+      await updateDoc(doc(db, 'users', userDoc.id), {
+        organizationId: orgId
       });
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to assign user to organization');
     }
   },
 
   removeUserFromOrg: async (email: string, orgId: string): Promise<void> => {
     try {
-      await apiRequest(`/organizations/${orgId}/members/${encodeURIComponent(email)}`, {
-        method: 'DELETE',
+      // Find user by email
+      const usersQuery = query(
+        collection(db, 'users'), 
+        where('email', '==', email),
+        where('organizationId', '==', orgId)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      
+      if (usersSnapshot.empty) {
+        throw new Error('User not found in organization');
+      }
+
+      const userDoc = usersSnapshot.docs[0];
+      await updateDoc(doc(db, 'users', userDoc.id), {
+        organizationId: null
       });
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to remove user from organization');
     }
+  },
+
+  onAuthStateChange: (callback: (user: User | null) => void) => {
+    return onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const user = await convertFirebaseUser(firebaseUser);
+          callback(user);
+        } catch (error) {
+          callback(null);
+        }
+      } else {
+        callback(null);
+      }
+    });
   },
 };

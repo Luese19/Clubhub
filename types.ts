@@ -11,6 +11,8 @@ export interface User {
   email: string;
   role: UserRole;
   organizationId: string | null;
+  name?: string;
+  createdAt?: string;
 }
 
 export interface Announcement {

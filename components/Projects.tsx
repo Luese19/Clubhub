@@ -4,7 +4,6 @@ import Header from './Header';
 import { ICONS } from '../constants';
 import { TaskStatus } from '../types';
 import type { ProjectTask, User } from '../types';
-import { generateProjectIdea } from '../services/geminiService';
 import { orgService } from '../services/orgService';
 
 const TaskCard: React.FC<{ task: ProjectTask; isAdmin: boolean; onDelete: (id: number) => void }> = ({ task, isAdmin, onDelete }) => (
@@ -86,8 +85,6 @@ const ProjectColumn: React.FC<{
 
 const Projects: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const isAdmin = currentUser.role === 'admin';
@@ -99,8 +96,12 @@ const Projects: React.FC<{ currentUser: User }> = ({ currentUser }) => {
         return;
     };
     setIsLoading(true);
-    const data = await orgService.getOrgData(orgId);
-    setTasks(data.tasks);
+    try {
+      const fetchedTasks = await orgService.getTasks(orgId);
+      setTasks(fetchedTasks);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
     setIsLoading(false);
   }, [orgId]);
 
@@ -110,31 +111,17 @@ const Projects: React.FC<{ currentUser: User }> = ({ currentUser }) => {
 
   const handleAddTask = useCallback(async (title: string, description: string) => {
     if(!orgId) return;
-    await orgService.addTask(orgId, { title, description });
+    await orgService.addTask(orgId, { title, description, status: TaskStatus.ToDo });
     fetchData();
   }, [orgId, fetchData]);
 
   const handleDeleteTask = useCallback(async (id: number) => {
     if (!orgId) return;
     if (window.confirm('Are you sure you want to delete this task?')) {
-        await orgService.deleteTask(orgId, id);
+        await orgService.deleteTask(id);
         fetchData();
     }
   }, [orgId, fetchData]);
-
-  const handleGenerateIdea = useCallback(async () => {
-      if(!orgId) return;
-      setIsGenerating(true);
-      setError(null);
-      try {
-          const idea = await generateProjectIdea();
-          await handleAddTask(idea.title, idea.description);
-      } catch (e: any) {
-          setError(e.message || 'An unknown error occurred.');
-      } finally {
-          setIsGenerating(false);
-      }
-  }, [orgId, handleAddTask]);
 
   const tasksByStatus = tasks.reduce((acc, task) => {
     acc[task.status] = acc[task.status] || [];
@@ -148,24 +135,7 @@ const Projects: React.FC<{ currentUser: User }> = ({ currentUser }) => {
 
   return (
     <div className="p-8 h-full flex flex-col">
-      <Header title="Project Tracker">
-          {isAdmin && (
-              <button
-                  onClick={handleGenerateIdea}
-                  disabled={isGenerating}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors duration-200 disabled:bg-slate-600 disabled:cursor-not-allowed"
-              >
-                  {isGenerating ? (
-                       <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                       </svg>
-                  ) : ICONS.sparkles}
-                  <span>{isGenerating ? 'Generating...' : 'Generate AI Idea'}</span>
-              </button>
-          )}
-      </Header>
-      {error && <div className="bg-red-500/20 border border-red-500 text-red-300 p-3 rounded-md mb-4">{error}</div>}
+      <Header title="Project Tracker" />
 
       <div className="flex-grow flex gap-6 overflow-x-auto pb-4">
         {Object.values(TaskStatus).map(status => (

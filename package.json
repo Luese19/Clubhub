@@ -5,19 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:client && npm run build:server",
-    "build:client": "vite build",
-    "build:server": "cd server && npm install && npm run build",
-    "preview": "vite preview",
-    "start": "cd server && npm start",
-    "dev:server": "cd server && npm run dev",
-    "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
-    "install:all": "npm install && cd server && npm install",
-    "migrate": "cd server && npm run migrate",
-    "heroku-postbuild": "npm run build:client && cd server && npm install && npm run build && cd .. && ls -la dist"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.11.0",
+    "firebase": "^12.0.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "6"
@@ -27,7 +19,6 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.7.0",
-    "concurrently": "^9.2.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

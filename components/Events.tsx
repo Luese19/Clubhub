@@ -62,8 +62,10 @@ const AdminEventForm: React.FC<{ onAdd: (event: Omit<ClubEvent, 'id' | 'organiza
             <form onSubmit={handleSubmit} className="space-y-4">
                 <input type="text" placeholder="Event Title" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none" required />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none" required />
-                    <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none" required />
+                    <label className="block text-slate-400 text-sm font-medium mb-1" htmlFor="event-date">Event Date</label>
+                    <input id="event-date" type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none" required />
+                    <label className="block text-slate-400 text-sm font-medium mb-1" htmlFor="event-time">Event Time</label>
+                    <input id="event-time" type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none" required />
                 </div>
                 <textarea placeholder="Event Description" value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none" rows={3} required />
                 <button type="submit" className="px-4 py-2 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 transition-colors duration-200">
@@ -86,8 +88,12 @@ const Events: React.FC<{ currentUser: User }> = ({ currentUser }) => {
             return;
         }
         setIsLoading(true);
-        const data = await orgService.getOrgData(orgId);
-        setEvents(data.events);
+        try {
+            const fetchedEvents = await orgService.getEvents(orgId);
+            setEvents(fetchedEvents);
+        } catch (error) {
+            console.error('Error fetching events:', error);
+        }
         setIsLoading(false);
     }, [orgId]);
 
@@ -104,7 +110,7 @@ const Events: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const handleDeleteEvent = async (id: number) => {
         if (!orgId) return;
         if(window.confirm('Are you sure you want to delete this event?')) {
-            await orgService.deleteEvent(orgId, id);
+            await orgService.deleteEvent(id);
             fetchData();
         }
     };

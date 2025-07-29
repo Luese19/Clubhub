@@ -10,9 +10,18 @@ import Resources from './components/Resources';
 import Gallery from './components/Gallery';
 import Auth from './components/Auth';
 import Organizations from './components/Organizations';
+import FirebaseSetupGuide from './components/FirebaseSetupGuide';
 import { authService } from './services/authService';
 import { orgService } from './services/orgService';
 import type { User, Organization } from './types';
+
+// Check if Firebase is configured
+const isFirebaseConfigured = () => {
+  return import.meta.env.VITE_FIREBASE_API_KEY && 
+         import.meta.env.VITE_FIREBASE_API_KEY !== "your_api_key_here" &&
+         import.meta.env.VITE_FIREBASE_PROJECT_ID &&
+         import.meta.env.VITE_FIREBASE_PROJECT_ID !== "your_project_id";
+};
 
 
 const App: React.FC = () => {
@@ -37,8 +46,11 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const user = authService.getCurrentUser();
-    loadUserData(user);
+    const unsubscribe = authService.onAuthStateChange(async (user) => {
+      await loadUserData(user);
+    });
+
+    return unsubscribe;
   }, [loadUserData]);
 
   const handleAuthSuccess = useCallback((user: User) => {
@@ -46,12 +58,21 @@ const App: React.FC = () => {
     loadUserData(user);
   }, [loadUserData]);
   
-  const handleLogout = useCallback(() => {
-    authService.signOut();
-    loadUserData(null);
+  const handleLogout = useCallback(async () => {
+    try {
+      await authService.signOut();
+      await loadUserData(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   }, [loadUserData]);
   
   const isSuperAdmin = currentUser?.role === 'admin' && !currentUser.organizationId;
+
+  // Show Firebase setup guide if not configured
+  if (!isFirebaseConfigured()) {
+    return <FirebaseSetupGuide />;
+  }
 
   if (isLoading) {
     return (

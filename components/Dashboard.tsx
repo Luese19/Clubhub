@@ -114,9 +114,16 @@ const Dashboard: React.FC<{ currentUser: User }> = ({ currentUser }) => {
             return;
         }
         setIsLoading(true);
-        const data = await orgService.getOrgData(orgId);
-        setAnnouncements(data.announcements);
-        setEvents(data.events);
+        try {
+            const [fetchedAnnouncements, fetchedEvents] = await Promise.all([
+                orgService.getAnnouncements(orgId),
+                orgService.getEvents(orgId)
+            ]);
+            setAnnouncements(fetchedAnnouncements);
+            setEvents(fetchedEvents);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
         setIsLoading(false);
     }, [orgId]);
 
@@ -139,7 +146,7 @@ const Dashboard: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const handleDeleteAnnouncement = async (id: number) => {
         if(!orgId) return;
         if(window.confirm('Are you sure you want to delete this announcement?')) {
-            await orgService.deleteAnnouncement(orgId, id);
+            await orgService.deleteAnnouncement(id);
             fetchData(); // Re-fetch
         }
     };

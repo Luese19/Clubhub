@@ -14,7 +14,7 @@
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "install:all": "npm install && cd server && npm install",
     "migrate": "cd server && npm run migrate",
-    "heroku-postbuild": "npm run build:client && cd server && npm install && npm run build"
+    "heroku-postbuild": "npm run build:client && cd server && npm install && npm run build && cd .. && ls -la dist"
   },
   "dependencies": {
     "@google/genai": "^1.11.0",

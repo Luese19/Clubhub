@@ -32,7 +32,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from React build in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../../../dist')));
+  const distPath = path.resolve(__dirname, '../../../dist');
+  console.log('Static files path:', distPath);
+  app.use(express.static(distPath));
 }
 
 // Health check endpoint
@@ -46,7 +48,9 @@ app.use('/api/auth', authRoutes);
 // Serve React app in production
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req: any, res: any) => {
-    res.sendFile(path.join(__dirname, '../../../dist/index.html'));
+    const indexPath = path.resolve(__dirname, '../../../dist/index.html');
+    console.log('Index.html path:', indexPath);
+    res.sendFile(indexPath);
   });
 }
 
@@ -66,8 +70,18 @@ if (process.env.NODE_ENV !== 'production') {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔍 Current directory: ${process.cwd()}`);
+  console.log(`🔍 __dirname: ${__dirname}`);
+  
   if (process.env.NODE_ENV === 'production') {
     console.log(`🌐 App: http://localhost:${PORT}`);
+    const distPath = path.resolve(__dirname, '../../../dist');
+    const fs = require('fs');
+    console.log(`🔍 Checking dist path: ${distPath}`);
+    console.log(`🔍 Dist exists: ${fs.existsSync(distPath)}`);
+    if (fs.existsSync(distPath)) {
+      console.log(`🔍 Dist contents:`, fs.readdirSync(distPath));
+    }
   }
 });
 

@@ -1,8 +1,18 @@
-import { query } from '../database';
+import { query, testConnection } from '../database';
 
 const createTables = async () => {
   try {
+    console.log('🔍 Testing database connection...');
+    const connected = await testConnection();
+    if (!connected) {
+      console.error('❌ Database connection failed. Please check your DATABASE_URL.');
+      process.exit(1);
+    }
+
+    console.log('📦 Creating database tables...');
+
     // Create organizations table first (no dependencies)
+    console.log('Creating organizations table...');
     await query(`
       CREATE TABLE IF NOT EXISTS organizations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -14,6 +24,7 @@ const createTables = async () => {
     `);
 
     // Create users table (references organizations)
+    console.log('Creating users table...');
     await query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -27,6 +38,7 @@ const createTables = async () => {
     `);
 
     // Create announcements table
+    console.log('Creating announcements table...');
     await query(`
       CREATE TABLE IF NOT EXISTS announcements (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -40,6 +52,7 @@ const createTables = async () => {
     `);
 
     // Create events table
+    console.log('Creating events table...');
     await query(`
       CREATE TABLE IF NOT EXISTS events (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -54,6 +67,7 @@ const createTables = async () => {
     `);
 
     // Create tasks table
+    console.log('Creating tasks table...');
     await query(`
       CREATE TABLE IF NOT EXISTS tasks (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -69,6 +83,7 @@ const createTables = async () => {
     `);
 
     // Create resources table
+    console.log('Creating resources table...');
     await query(`
       CREATE TABLE IF NOT EXISTS resources (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -83,6 +98,7 @@ const createTables = async () => {
     `);
 
     // Create indexes for better performance
+    console.log('Creating indexes...');
     await query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`);
     await query(`CREATE INDEX IF NOT EXISTS idx_users_organization_id ON users(organization_id);`);
     await query(`CREATE INDEX IF NOT EXISTS idx_announcements_organization_id ON announcements(organization_id);`);
@@ -90,9 +106,24 @@ const createTables = async () => {
     await query(`CREATE INDEX IF NOT EXISTS idx_tasks_organization_id ON tasks(organization_id);`);
     await query(`CREATE INDEX IF NOT EXISTS idx_resources_organization_id ON resources(organization_id);`);
 
-    console.log('Database tables created successfully!');
+    console.log('✅ Database tables created successfully!');
+    
+    // Verify tables were created
+    const tables = await query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      ORDER BY table_name;
+    `);
+    
+    console.log('📋 Created tables:', tables.rows.map(row => row.table_name));
+    
   } catch (error) {
-    console.error('Error creating tables:', error);
+    console.error('❌ Error creating tables:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: (error as any)?.code,
+      detail: (error as any)?.detail,
+    });
     process.exit(1);
   }
 };

@@ -35,53 +35,148 @@ const generateToken = (user: { id: string; email: string; role: UserRole; organi
 
 // Sign up
 router.post('/signup', async (req, res) => {
+  const startTime = Date.now();
+  console.log('🚀 Signup request received at', new Date().toISOString());
+  
   try {
+    // Validate input
     const { error } = signupSchema.validate(req.body);
     if (error) {
+      console.log('❌ Validation error:', error.details[0].message);
       return res.status(400).json({ error: error.details[0].message });
     }
 
     const { email, password } = req.body;
+    console.log('📝 Processing signup for email:', email);
 
     // Check if user already exists
-    const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) {
-      return res.status(409).json({ error: 'An account with this email already exists' });
+    console.log('🔍 Checking if user exists...');
+    const existingUserStart = Date.now();
+    
+    try {
+      const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+      console.log(`✅ User existence check completed in ${Date.now() - existingUserStart}ms`);
+      
+      if (existingUser.rows.length > 0) {
+        console.log('❌ User already exists');
+        return res.status(409).json({ error: 'An account with this email already exists' });
+      }
+    } catch (dbError: any) {
+      console.error('❌ Database error during user existence check:', dbError.message);
+      
+      if (dbError.code === '42P01') {
+        return res.status(500).json({ error: 'Database not properly initialized. Please run migrations.' });
+      }
+      
+      return res.status(500).json({ error: 'Database connection error. Please try again later.' });
     }
 
     // Hash password
+    console.log('🔐 Hashing password...');
+    const hashStart = Date.now();
     const passwordHash = await bcrypt.hash(password, 12);
+    console.log(`✅ Password hashing completed in ${Date.now() - hashStart}ms`);
 
     // Check if this is the first user (they become admin)
-    const userCount = await query('SELECT COUNT(*) FROM users');
-    const role: UserRole = parseInt(userCount.rows[0].count) === 0 ? 'admin' : 'student';
+    console.log('👥 Checking user count for role assignment...');
+    const userCountStart = Date.now();
+    
+    let role: UserRole = 'student'; // Default role
+    
+    try {
+      const userCount = await query('SELECT COUNT(*) FROM users');
+      console.log(`✅ User count check completed in ${Date.now() - userCountStart}ms`);
+      role = parseInt(userCount.rows[0].count) === 0 ? 'admin' : 'student';
+      console.log('🎭 Assigned role:', role);
+    } catch (dbError: any) {
+      console.error('⚠️ Failed to check user count, defaulting to student role:', dbError.message);
+      // Continue with default role
+    }
 
     // Create user
-    const result = await query(
-      'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role, organization_id',
-      [email, passwordHash, role]
-    );
+    console.log('👤 Creating user...');
+    const createUserStart = Date.now();
+    
+    try {
+      const result = await query(
+        'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role, organization_id',
+        [email, passwordHash, role]
+      );
+      
+      console.log(`✅ User creation completed in ${Date.now() - createUserStart}ms`);
 
-    const user = result.rows[0];
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      organizationId: user.organization_id,
-    });
+      if (!result.rows[0]) {
+        throw new Error('Failed to create user - no data returned');
+      }
 
-    res.status(201).json({
-      user: {
+      const user = result.rows[0];
+      console.log('🎉 User created successfully:', { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role,
+        organizationId: user.organization_id 
+      });
+
+      // Generate JWT token
+      console.log('🔑 Generating JWT token...');
+      const token = generateToken({
         id: user.id,
         email: user.email,
         role: user.role,
         organizationId: user.organization_id,
-      },
-      token,
+      });
+
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ Signup completed successfully in ${totalTime}ms`);
+
+      res.status(201).json({
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          organizationId: user.organization_id,
+        },
+        token,
+      });
+      
+    } catch (dbError: any) {
+      console.error('❌ Database error during user creation:', {
+        message: dbError.message,
+        code: dbError.code,
+        detail: dbError.detail,
+      });
+      
+      if (dbError.code === '23505') {
+        return res.status(409).json({ error: 'An account with this email already exists' });
+      }
+      
+      throw dbError; // Re-throw to be caught by outer catch
+    }
+    
+  } catch (error: any) {
+    const totalTime = Date.now() - startTime;
+    console.error(`❌ Signup failed after ${totalTime}ms:`, {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      detail: error.detail,
     });
-  } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    
+    // Provide appropriate error responses
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      return res.status(500).json({ error: 'Database connection failed. Please try again later.' });
+    }
+    
+    if (error.code === '28000') {
+      return res.status(500).json({ error: 'Database authentication error. Please contact support.' });
+    }
+    
+    if (error.code === '42P01') {
+      return res.status(500).json({ error: 'Database not properly initialized. Please contact support.' });
+    }
+    
+    // Generic error for any other cases
+    res.status(500).json({ error: 'Internal server error. Please try again later.' });
   }
 });
 

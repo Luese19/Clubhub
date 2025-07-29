@@ -7,6 +7,8 @@ import path from 'path';
 import fs from 'fs';
 import authRoutes from './routes/auth';
 import debugRoutes from './routes/debug';
+import organizationRoutes from './routes/organizations';
+import { testConnection } from './database';
 
 dotenv.config();
 
@@ -50,6 +52,7 @@ app.get('/health', (req: Request, res: Response) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/debug', debugRoutes);
+app.use('/api/organizations', organizationRoutes);
 
 // Serve React app in production
 if (process.env.NODE_ENV === 'production') {
@@ -80,11 +83,29 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔍 Current directory: ${process.cwd()}`);
   console.log(`🔍 __dirname: ${__dirname}`);
+  
+  // Test database connection with timeout
+  console.log('🔍 Testing database connection...');
+  try {
+    const dbConnected = await testConnection(15000); // 15 second timeout
+    if (dbConnected) {
+      console.log('✅ Database connection successful - server ready');
+    } else {
+      console.error('❌ Database connection failed - server will continue but signup may not work');
+      console.error('📋 Please check:');
+      console.error('   1. DATABASE_URL environment variable is correct');
+      console.error('   2. Database server is running and accessible');
+      console.error('   3. Network connectivity to database');
+      console.error('   4. Database credentials are valid');
+    }
+  } catch (error) {
+    console.error('❌ Database connection test threw error:', error);
+  }
   
   if (process.env.NODE_ENV === 'production') {
     console.log(`🌐 App: http://localhost:${PORT}`);
@@ -95,6 +116,11 @@ app.listen(PORT, () => {
       console.log(`🔍 Dist contents:`, fs.readdirSync(distPath));
     }
   }
+  
+  console.log('📡 API endpoints available:');
+  console.log(`   POST ${PORT === 3001 ? 'http://localhost:3001' : ''}/api/auth/signup`);
+  console.log(`   POST ${PORT === 3001 ? 'http://localhost:3001' : ''}/api/auth/signin`);
+  console.log(`   GET  ${PORT === 3001 ? 'http://localhost:3001' : ''}/health`);
 });
 
 export default app;

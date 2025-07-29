@@ -13,6 +13,7 @@
     "dev:server": "cd server && npm run dev",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "install:all": "npm install && cd server && npm install",
+    "migrate": "cd server && npm run migrate",
     "heroku-postbuild": "npm run build:client && cd server && npm install && npm run build"
   },
   "dependencies": {

@@ -87,7 +87,7 @@ const Projects: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAdmin = currentUser.role === 'admin';
+  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
   const orgId = currentUser.organizationId;
 
   const fetchData = useCallback(async () => {

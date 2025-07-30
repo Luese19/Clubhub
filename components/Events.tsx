@@ -79,7 +79,7 @@ const AdminEventForm: React.FC<{ onAdd: (event: Omit<ClubEvent, 'id' | 'organiza
 const Events: React.FC<{ currentUser: User }> = ({ currentUser }) => {
     const [events, setEvents] = useState<ClubEvent[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const isAdmin = currentUser.role === 'admin';
+    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
     const orgId = currentUser.organizationId;
 
     const fetchData = useCallback(async () => {

@@ -5,7 +5,7 @@ import { ICONS } from '../constants';
 import type { User, Organization } from '../types';
 
 const baseNavItems = [
-  { path: '/', name: 'Announcements', icon: ICONS.dashboard },
+  { path: '/dashboard', name: 'Dashboard', icon: ICONS.dashboard },
   { path: '/members', name: 'Members', icon: ICONS.members },
   { path: '/events', name: 'Events', icon: ICONS.events },
   { path: '/projects', name: 'Projects', icon: ICONS.projects },
@@ -29,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, currentUser, currentOrg }) 
   const activeClassName = "bg-gradient-to-r from-accent-500/20 to-transparent border-r-2 border-accent-400 text-white font-medium shadow-inner-glow";
   const inactiveClassName = "border-r-2 border-transparent";
   
-  const isSuperAdmin = currentUser?.role === 'admin' && !currentUser.organizationId;
+  const isSuperAdmin = currentUser?.role === 'superadmin';
   const navItems = isSuperAdmin ? [...baseNavItems, adminNavItem] : baseNavItems;
 
   return (
@@ -54,7 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, currentUser, currentOrg }) 
               <span className={`text-xs font-semibold px-3 py-1 rounded-full capitalize shadow-lg backdrop-blur-sm border ${
                 isSuperAdmin
                   ? 'bg-gradient-to-r from-amber-500/90 to-amber-400/90 text-white border-amber-400/30'
-                : currentUser.role === 'admin' 
+                : (currentUser.role === 'admin' || currentUser.role === 'superadmin') 
                   ? 'bg-gradient-to-r from-purple-500/90 to-purple-400/90 text-white border-purple-400/30' 
                   : 'bg-gradient-to-r from-accent-500/90 to-accent-400/90 text-white border-accent-400/30'
               }`}>

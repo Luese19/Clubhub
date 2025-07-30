@@ -1,5 +1,5 @@
 
-export type UserRole = 'admin' | 'student';
+export type UserRole = 'superadmin' | 'admin' | 'student';
 
 export interface Organization {
   id: string;
@@ -16,12 +16,17 @@ export interface User {
 }
 
 export interface Announcement {
-  id: number;
+  id: string;
   organizationId: string;
   title: string;
   content: string;
   author: string;
-  date: string;
+  authorEmail: string;
+  createdAt: string;
+  updatedAt?: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export interface ClubEvent {

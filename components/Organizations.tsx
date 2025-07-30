@@ -57,6 +57,115 @@ const CreateOrgForm: React.FC<{ onOrgCreated: () => void }> = ({ onOrgCreated })
     );
 };
 
+const AddMemberForm: React.FC<{ organizations: Organization[], onMemberAdded: () => void }> = ({ organizations, onMemberAdded }) => {
+    const [email, setEmail] = useState('');
+    const [selectedOrgId, setSelectedOrgId] = useState('');
+    const [role, setRole] = useState<'admin' | 'student'>('student');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedOrgId) {
+            setError('Please select an organization');
+            return;
+        }
+        
+        setError('');
+        setSuccess('');
+        setIsLoading(true);
+        
+        try {
+            // Use the assignAdminToOrg if role is admin, otherwise assignUserToOrg
+            if (role === 'admin') {
+                await authService.assignAdminToOrg(email, selectedOrgId);
+            } else {
+                await authService.assignUserToOrg(email, selectedOrgId);
+            }
+            
+            setSuccess(`Successfully assigned ${email} as ${role} to organization`);
+            setEmail('');
+            setSelectedOrgId('');
+            setRole('student');
+            onMemberAdded();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 mb-8">
+            <h2 className="text-xl font-bold text-white mb-4">Add Member to Organization</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label htmlFor="member-email" className="block text-sm font-medium text-slate-300 mb-2">
+                        Member Email
+                    </label>
+                    <input 
+                        id="member-email"
+                        type="email"
+                        placeholder="Member email address"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none"
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+                
+                <div>
+                    <label htmlFor="organization-select" className="block text-sm font-medium text-slate-300 mb-2">
+                        Organization
+                    </label>
+                    <select
+                        id="organization-select"
+                        value={selectedOrgId}
+                        onChange={e => setSelectedOrgId(e.target.value)}
+                        className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none"
+                        required
+                        disabled={isLoading}
+                    >
+                        <option value="">Select Organization</option>
+                        {organizations.map(org => (
+                            <option key={org.id} value={org.id}>{org.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label htmlFor="role-select" className="block text-sm font-medium text-slate-300 mb-2">
+                        Role
+                    </label>
+                    <select
+                        id="role-select"
+                        value={role}
+                        onChange={e => setRole(e.target.value as 'admin' | 'student')}
+                        className="w-full bg-slate-900 border-2 border-slate-700 focus:border-cyan-400 text-cyan-300 rounded-md px-3 py-2 outline-none"
+                        disabled={isLoading}
+                    >
+                        <option value="student">Student</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                
+                {error && <p className="text-sm text-red-400">{error}</p>}
+                {success && <p className="text-sm text-green-400">{success}</p>}
+                
+                <button 
+                    type="submit" 
+                    disabled={isLoading} 
+                    className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:bg-slate-600 transition-colors"
+                >
+                    {isLoading ? 'Adding Member...' : 'Add Member'}
+                </button>
+            </form>
+        </div>
+    );
+};
+
 const OrgCard: React.FC<{ org: Organization, index: number }> = ({ org, index }) => {
     const [members, setMembers] = useState<User[]>([]);
     const [isLoadingMembers, setIsLoadingMembers] = useState(true);
@@ -130,6 +239,7 @@ const Organizations: React.FC = () => {
         <div className="p-8">
             <Header title="Organization Management" />
             <CreateOrgForm onOrgCreated={fetchOrgs} />
+            <AddMemberForm organizations={orgs} onMemberAdded={fetchOrgs} />
 
             <h2 className="text-xl font-bold text-white mb-4 mt-8">Existing Organizations</h2>
             {isLoading ? <p>Loading organizations...</p> : (

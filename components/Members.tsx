@@ -91,7 +91,7 @@ const Members: React.FC<{ currentUser: User }> = ({ currentUser }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAdmin = currentUser.role === 'admin';
+  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
   const orgId = currentUser.organizationId;
   
   const fetchMembers = useCallback(async () => {

@@ -23,6 +23,22 @@ const isFirebaseConfigured = () => {
          import.meta.env.VITE_FIREBASE_PROJECT_ID !== "your_project_id";
 };
 
+// Get the appropriate dashboard route based on user role and organization
+const getDashboardRoute = (user: User | null): string => {
+  if (!user) return '/';
+  
+  switch (user.role) {
+    case 'superadmin':
+      return '/organizations'; // Super admin manages all organizations
+    case 'admin':
+    case 'student':
+      // All users can access dashboard, even if not assigned to an organization yet
+      return '/dashboard';
+    default:
+      return '/dashboard';
+  }
+};
+
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -46,11 +62,29 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = authService.onAuthStateChange(async (user) => {
-      await loadUserData(user);
+    const initializeApp = async () => {
+      // Initialize super admin
+      await authService.initialize();
+      
+      // Set up auth state listener
+      const unsubscribe = authService.onAuthStateChange(async (user) => {
+        await loadUserData(user);
+      });
+
+      return unsubscribe;
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    
+    initializeApp().then((unsub) => {
+      unsubscribe = unsub;
     });
 
-    return unsubscribe;
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [loadUserData]);
 
   const handleAuthSuccess = useCallback((user: User) => {
@@ -67,7 +101,7 @@ const App: React.FC = () => {
     }
   }, [loadUserData]);
   
-  const isSuperAdmin = currentUser?.role === 'admin' && !currentUser.organizationId;
+  const isSuperAdmin = currentUser?.role === 'superadmin';
 
   // Show Firebase setup guide if not configured
   if (!isFirebaseConfigured()) {
@@ -102,37 +136,6 @@ const App: React.FC = () => {
     return <Auth onAuthSuccess={handleAuthSuccess} />;
   }
 
-  if (!currentUser.organizationId && !isSuperAdmin) {
-    return (
-        <div className="min-h-screen bg-dark-900 relative overflow-hidden flex items-center justify-center">
-            {/* Background Effects */}
-            <div className="absolute inset-0 bg-gradient-to-br from-dark-800 via-dark-900 to-dark-950"></div>
-            <div className="absolute top-1/3 left-1/3 w-72 h-72 bg-accent-500/10 rounded-full blur-3xl animate-float"></div>
-            <div className="absolute bottom-1/3 right-1/3 w-96 h-96 bg-glow-purple/10 rounded-full blur-3xl"></div>
-            
-            {/* Content */}
-            <div className="relative z-10 max-w-md mx-auto text-center p-8">
-                <div className="bg-dark-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
-                    <div className="w-16 h-16 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                        </svg>
-                    </div>
-                    <h1 className="text-2xl font-bold text-white mb-2">Welcome to ClubHub</h1>
-                    <p className="text-slate-400 mb-1">Hello, {currentUser.email}</p>
-                    <p className="text-slate-500 text-sm mb-6">You're not yet assigned to an organization. Please contact an administrator to join a club.</p>
-                    <button 
-                        onClick={handleLogout} 
-                        className="w-full bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-glow-sm transition-all duration-300 transform hover:scale-105"
-                    >
-                        Sign Out
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-  }
-
   return (
     <HashRouter>
       <div className="min-h-screen bg-dark-900 relative overflow-hidden">
@@ -150,14 +153,15 @@ const App: React.FC = () => {
           <Sidebar onLogout={handleLogout} currentUser={currentUser} currentOrg={currentOrg} />
           <main className="flex-1 overflow-y-auto scrollbar-hide">
             <Routes>
-              <Route path="/" element={<Dashboard currentUser={currentUser} />} />
+              <Route path="/" element={<Navigate to={getDashboardRoute(currentUser)} />} />
+              <Route path="/dashboard" element={<Dashboard currentUser={currentUser} />} />
               <Route path="/members" element={<Members currentUser={currentUser} />} />
               <Route path="/events" element={<Events currentUser={currentUser} />} />
               <Route path="/projects" element={<Projects currentUser={currentUser} />} />
               <Route path="/resources" element={<Resources />} />
               <Route path="/gallery" element={<Gallery />} />
               {isSuperAdmin && <Route path="/organizations" element={<Organizations />} />}
-              <Route path="*" element={<Navigate to="/" />} />
+              <Route path="*" element={<Navigate to={getDashboardRoute(currentUser)} />} />
             </Routes>
           </main>
         </div>

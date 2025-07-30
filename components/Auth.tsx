@@ -15,26 +15,36 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setShowSuccess(false);
     setIsLoading(true);
 
     try {
-        const user = mode === 'signin'
-            ? await authService.signIn(email, password)
-            : await authService.signUp(email, password);
+      if (mode === 'signin') {
+        const user = await authService.signIn(email, password);
         onAuthSuccess(user);
+      } else {
+        // Sign up mode - simple account creation
+        const user = await authService.signUp(email, password);
+        
+        // After successful signup, automatically sign them in
+        onAuthSuccess(user);
+      }
     } catch (err: any) {
-        setError(err.message || 'An unexpected error occurred.');
-        setIsLoading(false);
+      setError(err.message || 'An unexpected error occurred.');
+      setShowSuccess(false);
+      setIsLoading(false);
     }
   };
   
   const toggleMode = () => {
       setMode(prevMode => prevMode === 'signin' ? 'signup' : 'signin');
       setError('');
+      setShowSuccess(false);
       setEmail('');
       setPassword('');
   }
@@ -118,9 +128,22 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                 )}
               </button>
 
-              {error && (
-                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl backdrop-blur-sm">
-                  <p className="text-center text-red-400 text-sm font-medium">{error}</p>
+              {(error || showSuccess) && (
+                <div className={`p-4 border rounded-xl backdrop-blur-sm ${
+                  showSuccess
+                    ? 'bg-green-500/10 border-green-500/30' 
+                    : 'bg-red-500/10 border-red-500/30'
+                }`}>
+                  <p className={`text-center text-sm font-medium ${
+                    showSuccess
+                      ? 'text-green-400' 
+                      : 'text-red-400'
+                  }`}>
+                    {showSuccess 
+                      ? 'Account created successfully! Please sign in with your credentials.'
+                      : error
+                    }
+                  </p>
                 </div>
               )}
             </form>

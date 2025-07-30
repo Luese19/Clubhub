@@ -61,6 +61,30 @@ export const orgService = {
 
       const orgRef = await addDoc(collection(db, 'organizations'), orgData);
       
+      // Now assign the admin user to this organization
+      try {
+        // Find the user by email
+        const usersQuery = query(
+          collection(db, 'users'),
+          where('email', '==', adminEmail)
+        );
+        const usersSnapshot = await getDocs(usersQuery);
+        
+        if (!usersSnapshot.empty) {
+          const userDoc = usersSnapshot.docs[0];
+          // Update the user's organizationId and role
+          await updateDoc(doc(db, 'users', userDoc.id), {
+            organizationId: orgRef.id,
+            role: 'admin' // Ensure they have admin role
+          });
+        } else {
+          console.warn(`Admin user with email ${adminEmail} not found. They will need to be assigned manually.`);
+        }
+      } catch (assignError) {
+        console.error('Failed to assign admin to organization:', assignError);
+        // Don't throw here as the organization was created successfully
+      }
+      
       return {
         id: orgRef.id,
         name,
@@ -74,47 +98,196 @@ export const orgService = {
   // === Announcements ===
   getAnnouncements: async (orgId: string): Promise<Announcement[]> => {
     try {
+      // Try the compound query first (requires composite index)
       const announcementsQuery = query(
         collection(db, 'announcements'),
         where('organizationId', '==', orgId),
+        where('isDeleted', '!=', true),
+        orderBy('isDeleted'),
         orderBy('createdAt', 'desc')
       );
       const announcementsSnapshot = await getDocs(announcementsQuery);
       
-      return announcementsSnapshot.docs.map(doc => ({
-        id: parseInt(doc.id),
-        ...doc.data()
-      } as Announcement));
+      return announcementsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt;
+        
+        return {
+          id: doc.id,
+          ...data,
+          createdAt
+        } as Announcement;
+      });
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to fetch announcements');
+      // If the compound query fails (e.g., missing index), try a simpler query
+      console.warn('Compound query failed, trying simple query:', error.message);
+      try {
+        const announcementsQuery = query(
+          collection(db, 'announcements'),
+          where('organizationId', '==', orgId),
+          orderBy('createdAt', 'desc')
+        );
+        const announcementsSnapshot = await getDocs(announcementsQuery);
+        
+        return announcementsSnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt;
+            
+            return {
+              id: doc.id,
+              ...data,
+              createdAt
+            } as Announcement;
+          })
+          .filter(announcement => !announcement.isDeleted);
+      } catch (simpleError: any) {
+        console.warn('Simple query also failed, using basic query:', simpleError.message);
+        // Final fallback: basic query without ANY orderBy, then sort in memory
+        try {
+          const basicQuery = query(
+            collection(db, 'announcements'),
+            where('organizationId', '==', orgId)
+          );
+          const basicSnapshot = await getDocs(basicQuery);
+          
+          return basicSnapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt;
+              
+              return {
+                id: doc.id,
+                ...data,
+                createdAt
+              } as Announcement;
+            })
+            .filter(announcement => !announcement.isDeleted)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        } catch (basicError: any) {
+          console.error('All announcement queries failed:', basicError);
+          // Ultimate fallback: return empty array to prevent app crash
+          return [];
+        }
+      }
     }
   },
 
-  addAnnouncement: async (orgId: string, data: Omit<Announcement, 'id' | 'organizationId'>): Promise<Announcement> => {
+  addAnnouncement: async (orgId: string, data: Omit<Announcement, 'id' | 'organizationId' | 'createdAt' | 'authorEmail'>): Promise<Announcement> => {
     try {
       const announcementData = {
         ...data,
         organizationId: orgId,
-        createdAt: Timestamp.now()
+        authorEmail: data.author, // Assuming author is actually the email
+        createdAt: Timestamp.now(),
+        isDeleted: false
       };
 
       const announcementRef = await addDoc(collection(db, 'announcements'), announcementData);
       
       return {
-        id: parseInt(announcementRef.id),
+        id: announcementRef.id,
         ...data,
-        organizationId: orgId
+        organizationId: orgId,
+        authorEmail: data.author,
+        createdAt: new Date().toISOString(),
+        isDeleted: false
       };
     } catch (error: any) {
       throw new Error(error.message || 'Failed to add announcement');
     }
   },
 
-  deleteAnnouncement: async (announcementId: number): Promise<void> => {
+  deleteAnnouncement: async (announcementId: string, deletedBy: string): Promise<void> => {
     try {
-      await deleteDoc(doc(db, 'announcements', announcementId.toString()));
+      // Soft delete - mark as deleted instead of actually deleting
+      await updateDoc(doc(db, 'announcements', announcementId), {
+        isDeleted: true,
+        deletedAt: Timestamp.now(),
+        deletedBy: deletedBy
+      });
     } catch (error: any) {
       throw new Error(error.message || 'Failed to delete announcement');
+    }
+  },
+
+  // Get deleted announcements for history
+  getDeletedAnnouncements: async (orgId: string): Promise<Announcement[]> => {
+    try {
+      const announcementsQuery = query(
+        collection(db, 'announcements'),
+        where('organizationId', '==', orgId),
+        where('isDeleted', '==', true),
+        orderBy('deletedAt', 'desc')
+      );
+      const announcementsSnapshot = await getDocs(announcementsQuery);
+      
+      return announcementsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt;
+        const deletedAt = data.deletedAt?.toDate ? data.deletedAt.toDate().toISOString() : data.deletedAt;
+        
+        return {
+          id: doc.id,
+          ...data,
+          createdAt,
+          deletedAt
+        } as Announcement;
+      });
+    } catch (error: any) {
+      console.warn('Deleted announcements query failed, using fallback:', error);
+      // Fallback: basic query without orderBy, then sort in memory
+      try {
+        const basicQuery = query(
+          collection(db, 'announcements'),
+          where('organizationId', '==', orgId)
+        );
+        const basicSnapshot = await getDocs(basicQuery);
+        
+        return basicSnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt;
+            const deletedAt = data.deletedAt?.toDate ? data.deletedAt.toDate().toISOString() : data.deletedAt;
+            
+            return {
+              id: doc.id,
+              ...data,
+              createdAt,
+              deletedAt
+            } as Announcement;
+          })
+          .filter(announcement => announcement.isDeleted)
+          .sort((a, b) => {
+            if (!a.deletedAt || !b.deletedAt) return 0;
+            return new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime();
+          });
+      } catch (basicError: any) {
+        console.error('Deleted announcements fallback failed:', basicError);
+        return [];
+      }
+    }
+  },
+
+  // Permanently delete an announcement
+  permanentlyDeleteAnnouncement: async (announcementId: string): Promise<void> => {
+    try {
+      await deleteDoc(doc(db, 'announcements', announcementId));
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to permanently delete announcement');
+    }
+  },
+
+  // Restore a deleted announcement
+  restoreAnnouncement: async (announcementId: string): Promise<void> => {
+    try {
+      await updateDoc(doc(db, 'announcements', announcementId), {
+        isDeleted: false,
+        deletedAt: null,
+        deletedBy: null
+      });
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to restore announcement');
     }
   },
 
@@ -133,7 +306,25 @@ export const orgService = {
         ...doc.data()
       } as ClubEvent));
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to fetch events');
+      console.warn('Events query failed, using fallback:', error);
+      // Fallback: basic query without orderBy, then sort in memory
+      try {
+        const basicQuery = query(
+          collection(db, 'events'),
+          where('organizationId', '==', orgId)
+        );
+        const basicSnapshot = await getDocs(basicQuery);
+        
+        return basicSnapshot.docs
+          .map(doc => ({
+            id: parseInt(doc.id),
+            ...doc.data()
+          } as ClubEvent))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      } catch (basicError: any) {
+        console.error('Events fallback failed:', basicError);
+        return [];
+      }
     }
   },
 
